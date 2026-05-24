@@ -10,7 +10,10 @@ local isAdmin = (LocalPlayer.Name == "sekaisaikyoua_a")
 local isAllowed = false
 
 for _, name in ipairs(AllowedUsers) do
-    if LocalPlayer.Name == name then isAllowed = true break end
+    if LocalPlayer.Name == name then
+        isAllowed = true
+        break
+    end
 end
 
 if not isAllowed then
@@ -18,64 +21,32 @@ if not isAllowed then
     return 
 end
 
--- ==================== ビジュアルUI設定 (RGB & Watermark) ====================
-local RunService = game:GetService("RunService")
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "VisualOverlays"
+-- ==================== 自動BGM再生 (起動時に実行) ====================
+local SoundService = game:GetService("SoundService")
+local bgm = Instance.new("Sound")
+bgm.Name = "AutoBGM"
+bgm.SoundId = "rbxassetid://115189039255362"
+bgm.Volume = 2
+bgm.Looped = true
+bgm.Parent = SoundService
+bgm:Play()
 
--- 1. 画面右上の透かし (Watermark)
-local Watermark = Instance.new("TextLabel", ScreenGui)
-Watermark.Size = UDim2.new(0, 200, 0, 30)
-Watermark.Position = UDim2.new(1, -210, 0, 10)
-Watermark.BackgroundTransparency = 0.5
-Watermark.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
-Watermark.TextSize = 14
-Watermark.Font = Enum.Font.Code
-Watermark.Text = "あーあはぶプレミア | " .. LocalPlayer.Name
-local uiCorner = Instance.new("UICorner", Watermark)
-
--- 2. アナウンス用RGBラベル
-local AnnounceLabel = Instance.new("TextLabel", ScreenGui)
-AnnounceLabel.Size = UDim2.new(1, 0, 0, 80)
-AnnounceLabel.Position = UDim2.new(0, 0, 0.15, 0)
-AnnounceLabel.BackgroundTransparency = 1
-AnnounceLabel.TextSize = 45
-AnnounceLabel.Font = Enum.Font.GothamBold
-AnnounceLabel.Text = ""
-AnnounceLabel.TextStrokeTransparency = 0.5
-
--- RGBアニメーション
-task.spawn(function()
-    while true do
-        local hue = tick() % 5 / 5
-        local color = Color3.fromHSV(hue, 1, 1)
-        AnnounceLabel.TextColor3 = color
-        Watermark.BorderColor3 = color
-        RunService.RenderStepped:Wait()
-    end
-end)
-
--- ==================== 共有オブジェクト ====================
+-- ==================== リアルタイム同期用オブジェクト ====================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SharedFolder = ReplicatedStorage:FindFirstChild("AdminSharedFolder") or Instance.new("Folder", ReplicatedStorage)
 SharedFolder.Name = "AdminSharedFolder"
 local MessageValue = SharedFolder:FindFirstChild("GlobalMsg") or Instance.new("StringValue", SharedFolder)
-local AnnounceValue = SharedFolder:FindFirstChild("GlobalAnnounce") or Instance.new("StringValue", SharedFolder)
+MessageValue.Name = "GlobalMsg"
 
-AnnounceValue.Changed:Connect(function(val)
-    if val ~= "" then
-        AnnounceLabel.Text = "【管理者通知】\n" .. val
-        task.wait(7)
-        AnnounceLabel.Text = ""
-    end
-end)
-
--- ==================== スクリプト本体 (Orion HUB) ====================
+-- ==================== スクリプト本体 ====================
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jadpy/suki/refs/heads/main/orion"))()
+local RunService = game:GetService("RunService")
 local Workspace = workspace
+
+-- リモート
 local CharacterEvents = ReplicatedStorage:WaitForChild("CharacterEvents")
 local RagdollRemote = CharacterEvents:WaitForChild("RagdollRemote")
+local Struggle = CharacterEvents:FindFirstChild("Struggle")
 local SpawnRemote = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
 local GE = ReplicatedStorage:WaitForChild("GrabEvents")
 
@@ -83,55 +54,62 @@ local Window = OrionLib:MakeWindow({
     Name = "あーあはぶプレミア",
     HidePremium = false,
     SaveConfig = false,
-    IntroEnabled = true,
-    IntroText = "Welcome to あーあはぶプレミア"
+    ConfigFolder = "VaB_Config",
+    IntroEnabled = false
 })
 
--- 自動BGM再生
-local SoundService = game:GetService("SoundService")
-local bgm = Instance.new("Sound")
-bgm.SoundId = "rbxassetid://115189039255362"
-bgm.Volume = 1.5
-bgm.Looped = true
-bgm.Parent = SoundService
-bgm:Play()
-
--- ==================== 管理者タブ ====================
+-- ==================== 管理機能タブ ====================
 local PermissionTab = Window:MakeTab({ Name = "管理者に許可", Icon = "rbxassetid://4483345998" })
 PermissionTab:AddTextbox({
-    Name = "メッセージを管理者に送る",
+    Name = "メッセージ送信",
     Default = "",
     TextDisappear = true,
     Callback = function(Value)
         if Value ~= "" then
             MessageValue.Value = "[" .. LocalPlayer.DisplayName .. "]: " .. Value
+            OrionLib:MakeNotification({Name = "送信完了", Content = "管理者に送信しました。", Time = 2})
         end
     end
 })
 
 if isAdmin then
-    local AdminNotifTab = Window:MakeTab({ Name = "管理者通知", Icon = "shield" })
+    local AdminNotifTab = Window:MakeTab({ Name = "管理者通知", Icon = "rbxassetid://4483345998" })
+    AdminNotifTab:AddLabel("--- リアルタイムログ ---")
     MessageValue.Changed:Connect(function(newVal)
-        if newVal ~= "" then AdminNotifTab:AddLabel(newVal) end
-    end)
-
-    local AnnounceTab = Window:MakeTab({ Name = "アナウンス", Icon = "megaphone" })
-    AnnounceTab:AddTextbox({
-        Name = "全体に虹色アナウンスを流す",
-        Default = "",
-        TextDisappear = true,
-        Callback = function(Value)
-            if Value ~= "" then
-                AnnounceValue.Value = Value
-                task.wait(0.1)
-                AnnounceValue.Value = ""
-            end
+        if newVal ~= "" then
+            AdminNotifTab:AddLabel(newVal)
+            OrionLib:MakeNotification({Name = "新着メッセージ", Content = newVal, Time = 5})
         end
-    })
+    end)
 end
 
--- ==================== メイン機能 (Anti/Attack/Toy) ====================
+-- ==================== 1. anti タブ ====================
 local AntiTab = Window:MakeTab({ Name = " anti", Icon = "shield" })
+
+AntiTab:AddToggle({
+    Name = "Anti Network",
+    Callback = function(v)
+        if _G.AN then _G.AN:Disconnect() end
+        if v then
+            _G.AN = RunService.Heartbeat:Connect(function()
+                local myToys = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                local burger = myToys and myToys:FindFirstChild("FoodHamburger")
+                if not burger then
+                    SpawnRemote:InvokeServer("FoodHamburger", CFrame.new(-153.3, -5.6, 62.6), Vector3.new(0, 92.6, 0))
+                else
+                    local hp = burger:FindFirstChild("HoldPart")
+                    if hp then
+                        pcall(function()
+                            hp.HoldItemRemoteFunction:InvokeServer(burger, LocalPlayer.Character)
+                            hp.DropItemRemoteFunction:InvokeServer(burger, CFrame.new(-160.7, -8.6, 62.9), Vector3.new(0, 92.6, 0))
+                        end)
+                    end
+                end
+            end)
+        end
+    end
+})
+
 AntiTab:AddToggle({
     Name = "Anti KilI (Ultra Fast)", 
     Callback = function(v) 
@@ -139,14 +117,62 @@ AntiTab:AddToggle({
         if v then 
             _G.AK = RunService.RenderStepped:Connect(function() 
                 local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then RagdollRemote:FireServer(hrp, 999999) end 
+                if hrp then 
+                    RagdollRemote:FireServer(hrp, 999999) 
+                end 
             end) 
         end 
     end 
 })
 
-local ToyModTab = Window:MakeTab({ Name = "toymod", Icon = "hammer" })
+AntiTab:AddToggle({ Name = "Anti Grab", Callback = function(v) if _G.AG then _G.AG:Disconnect() end if v then _G.AG = RunService.Heartbeat:Connect(function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head"):FindFirstChild("PartOwner") then Struggle:FireServer(LocalPlayer) end end) end end })
+AntiTab:AddToggle({ Name = "Anti Blobman", Callback = function(on) _G.AB = on Workspace.DescendantAdded:Connect(function(t) if t.Name == "CreatureBlobman" and _G.AB then pcall(function() t.LeftDetector:Destroy() t.RightDetector:Destroy() end) end end) end })
+AntiTab:AddToggle({ Name = "Anti Explosion", Callback = function(on) _G.AE = on Workspace.ChildAdded:Connect(function(m) local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart") if m.Name == "Part" and _G.AE and hrp and (m.Position - hrp.Position).Magnitude <= 20 then hrp.Anchored = true; task.wait(0.1); hrp.Anchored = false end end) end })
+AntiTab:AddToggle({ Name = "Anti Void", Callback = function(v) if _G.AV then _G.AV:Disconnect() end if v then _G.AV = RunService.Heartbeat:Connect(function() local p = LocalPlayer.Character and LocalPlayer.Character.PrimaryPart if p and p.Position.Y < -50 then LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(p.Position.X, 50, p.Position.Z)) end end) end end })
+
+-- ==================== 2. Attack タブ ====================
+local AttackTab = Window:MakeTab({ Name = "Attack", Icon = "swords" })
 local targetPlayer = nil
+local attackMode = "Blobman kill"
+local attackEnabled = false
+
+AttackTab:AddDropdown({ Name = "Mode", Options = {"Blobman kill", "Blobman kick＋spam"}, Default = "Blobman kill", Callback = function(v) attackMode = v end })
+AttackTab:AddToggle({
+    Name = "Auto Attack Loop",
+    Callback = function(v)
+        attackEnabled = v
+        task.spawn(function()
+            while attackEnabled do
+                RunService.Heartbeat:Wait()
+                local target = targetPlayer
+                if target and target.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local tRoot = target.Character.HumanoidRootPart
+                    local lRoot = LocalPlayer.Character.HumanoidRootPart
+                    local blob = (function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid") if h and h.SeatPart and h.SeatPart.Parent.Name == "CreatureBlobman" then return h.SeatPart.Parent end return nil end)()
+                    if not blob then
+                        SpawnRemote:InvokeServer("CreatureBlobman", lRoot.CFrame, Vector3.new(0, 127, 0))
+                        task.wait(0.5)
+                        local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys") or Workspace
+                        for _, b in pairs(folder:GetChildren()) do if b.Name == "CreatureBlobman" then b.VehicleSeat:Sit(LocalPlayer.Character.Humanoid) blob = b break end end
+                    end
+                    if blob and tRoot then
+                        if attackMode == "Blobman kill" then
+                            lRoot.CFrame = tRoot.CFrame
+                            pcall(function() target.Character.Humanoid.BreakJointsOnDeath = false target.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Dead) end)
+                            local d = blob:FindFirstChild("LeftDetector") or blob:FindFirstChild("RightDetector")
+                            for i=1, 5 do blob.BlobmanSeatAndOwnerScript.CreatureGrab:FireServer(d, tRoot, d:FindFirstChildWhichIsA("Weld")) task.wait(0.02) blob.BlobmanSeatAndOwnerScript.CreatureRelease:FireServer(d:FindFirstChildWhichIsA("Weld")) task.wait(0.02) end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+})
+
+-- ==================== 3. toymod タブ ====================
+local ToyModTab = Window:MakeTab({ Name = "toymod", Icon = "rbxassetid://4483345998" })
+local toyLoopEnabled = false
+
 ToyModTab:AddDropdown({
     Name = "Select Target",
     Options = (function() local n = {} for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(n, p.DisplayName) end end return n end)(),
@@ -156,25 +182,40 @@ ToyModTab:AddDropdown({
 ToyModTab:AddToggle({
     Name = "Missile Fix & Campfire TP Loop",
     Callback = function(v)
-        _G.ToyLoop = v
-        task.spawn(function()
-            while _G.ToyLoop do
-                RunService.Heartbeat:Wait()
-                if targetPlayer and targetPlayer.Character then
-                    local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    if tRoot then
+        toyLoopEnabled = v
+        if v then
+            task.spawn(function()
+                while toyLoopEnabled do
+                    RunService.Heartbeat:Wait()
+                    local target = targetPlayer
+                    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                        local tRoot = target.Character.HumanoidRootPart
                         local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
                         local missileCF = tRoot.CFrame * CFrame.new(2, -3, 0) * CFrame.Angles(math.rad(-45), math.rad(45), 0)
-                        pcall(function()
-                            local m = folder:FindFirstChild("BombMissile") or SpawnRemote:InvokeServer("BombMissile", missileCF, Vector3.new(0,90,0))
-                            if m then (m:FindFirstChild("Body") or m.PrimaryPart).CFrame = missileCF end
-                            local c = folder:FindFirstChild("Campfire") or SpawnRemote:InvokeServer("Campfire", missileCF, Vector3.new(0,-137,0))
-                            if c then for _,p in pairs(c:GetDescendants()) do if p:IsA("BasePart") then p.CFrame = missileCF; GE.SetNetworkOwner:FireServer(p, p.CFrame) end end end
-                        end)
+
+                        local missile = folder and folder:FindFirstChild("BombMissile")
+                        if not missile then
+                            SpawnRemote:InvokeServer("BombMissile", missileCF, Vector3.new(0, 90, 0))
+                        else
+                            local mBody = missile:FindFirstChild("Body") or missile:FindFirstChildWhichIsA("BasePart", true)
+                            if mBody then mBody.CFrame = missileCF end
+                        end
+
+                        local campfire = folder and folder:FindFirstChild("Campfire")
+                        if campfire then
+                            for _, part in pairs(campfire:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                    part.CFrame = missileCF
+                                    GE.SetNetworkOwner:FireServer(part, part.CFrame)
+                                end
+                            end
+                        else
+                            SpawnRemote:InvokeServer("Campfire", missileCF, Vector3.new(0, -137.667, 0))
+                        end
                     end
                 end
-            end
-        end)
+            end)
+        end
     end
 })
 
