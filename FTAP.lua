@@ -1,7 +1,7 @@
 -- ==================== ホワイトリスト設定 ====================
 local AllowedUsers = {
     "sekaisaikyoua_a", "Tjrvovh30", "bananasabu85", "yuttan1029", "moro101971", 
-    "apmp2286", "attj636", "pokotin0413", "akannde12121"
+    "apmp2286", "attj636", "pokotin0413", "akannde12121", "wdsauj1" -- wdsauj1を追加しました
 }
 
 local Players = game:GetService("Players")
@@ -20,16 +20,6 @@ if not isAllowed then
     LocalPlayer:Kick("お前は誰？特定するね、🥰")
     return 
 end
-
--- ==================== 自動BGM再生 (起動時に実行) ====================
-local SoundService = game:GetService("SoundService")
-local bgm = Instance.new("Sound")
-bgm.Name = "AutoBGM"
-bgm.SoundId = "rbxassetid://115189039255362"
-bgm.Volume = 2
-bgm.Looped = true
-bgm.Parent = SoundService
-bgm:Play()
 
 -- ==================== リアルタイム同期用オブジェクト ====================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -83,7 +73,7 @@ if isAdmin then
     end)
 end
 
--- ==================== 1. anti タブ ====================
+-- ==================== 1. anti タブ (高速化修正) ====================
 local AntiTab = Window:MakeTab({ Name = " anti", Icon = "shield" })
 
 AntiTab:AddToggle({
