@@ -2,7 +2,7 @@
 local AllowedUsers = {
     "sekaisaikyoua_a", "Tjrvovh30", "bananasabu85", "yuttan1029", "moro101971", 
     "apmp2286", "attj636", "pokotin0413", "akannde12121", "wdsauj1",
-    "fffffxyzz", "pnti042", "ahehehe740" -- 追加しました
+    "fffffxyzz", "pnti042", "ahehehe740"
 }
 
 local Players = game:GetService("Players")
@@ -74,7 +74,7 @@ if isAdmin then
     end)
 end
 
--- ==================== 1. anti タブ (高速化修正) ====================
+-- ==================== 1. anti タブ ====================
 local AntiTab = Window:MakeTab({ Name = " anti", Icon = "shield" })
 
 AntiTab:AddToggle({
@@ -121,13 +121,20 @@ AntiTab:AddToggle({ Name = "Anti Blobman", Callback = function(on) _G.AB = on Wo
 AntiTab:AddToggle({ Name = "Anti Explosion", Callback = function(on) _G.AE = on Workspace.ChildAdded:Connect(function(m) local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart") if m.Name == "Part" and _G.AE and hrp and (m.Position - hrp.Position).Magnitude <= 20 then hrp.Anchored = true; task.wait(0.1); hrp.Anchored = false end end) end })
 AntiTab:AddToggle({ Name = "Anti Void", Callback = function(v) if _G.AV then _G.AV:Disconnect() end if v then _G.AV = RunService.Heartbeat:Connect(function() local p = LocalPlayer.Character and LocalPlayer.Character.PrimaryPart if p and p.Position.Y < -50 then LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(p.Position.X, 50, p.Position.Z)) end end) end end })
 
--- ==================== 2. Attack タブ ====================
+-- ==================== 2. Attack タブ (修正済み) ====================
 local AttackTab = Window:MakeTab({ Name = "Attack", Icon = "swords" })
 local targetPlayer = nil
 local attackMode = "Blobman kill"
 local attackEnabled = false
 
+AttackTab:AddDropdown({
+    Name = "Select Target",
+    Options = (function() local n = {} for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(n, p.DisplayName) end end return n end)(),
+    Callback = function(v) for _, p in pairs(Players:GetPlayers()) do if p.DisplayName == v then targetPlayer = p end end end
+})
+
 AttackTab:AddDropdown({ Name = "Mode", Options = {"Blobman kill", "Blobman kick＋spam"}, Default = "Blobman kill", Callback = function(v) attackMode = v end })
+
 AttackTab:AddToggle({
     Name = "Auto Attack Loop",
     Callback = function(v)
@@ -136,22 +143,43 @@ AttackTab:AddToggle({
             while attackEnabled do
                 RunService.Heartbeat:Wait()
                 local target = targetPlayer
-                if target and target.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local tRoot = target.Character.HumanoidRootPart
+                if target and target.Character and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local tRoot = target.Character:FindFirstChild("HumanoidRootPart")
                     local lRoot = LocalPlayer.Character.HumanoidRootPart
-                    local blob = (function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid") if h and h.SeatPart and h.SeatPart.Parent.Name == "CreatureBlobman" then return h.SeatPart.Parent end return nil end)()
-                    if not blob then
-                        SpawnRemote:InvokeServer("CreatureBlobman", lRoot.CFrame, Vector3.new(0, 127, 0))
-                        task.wait(0.5)
-                        local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys") or Workspace
-                        for _, b in pairs(folder:GetChildren()) do if b.Name == "CreatureBlobman" then b.VehicleSeat:Sit(LocalPlayer.Character.Humanoid) blob = b break end end
-                    end
-                    if blob and tRoot then
-                        if attackMode == "Blobman kill" then
-                            lRoot.CFrame = tRoot.CFrame
-                            pcall(function() target.Character.Humanoid.BreakJointsOnDeath = false target.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Dead) end)
-                            local d = blob:FindFirstChild("LeftDetector") or blob:FindFirstChild("RightDetector")
-                            for i=1, 5 do blob.BlobmanSeatAndOwnerScript.CreatureGrab:FireServer(d, tRoot, d:FindFirstChildWhichIsA("Weld")) task.wait(0.02) blob.BlobmanSeatAndOwnerScript.CreatureRelease:FireServer(d:FindFirstChildWhichIsA("Weld")) task.wait(0.02) end
+                    
+                    if tRoot then
+                        local blob = (function() 
+                            local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid") 
+                            if h and h.SeatPart and h.SeatPart.Parent.Name == "CreatureBlobman" then 
+                                return h.SeatPart.Parent 
+                            end 
+                            return nil 
+                        end)()
+
+                        if not blob then
+                            SpawnRemote:InvokeServer("CreatureBlobman", lRoot.CFrame, Vector3.new(0, 127, 0))
+                            task.wait(0.5)
+                            local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys") or Workspace
+                            for _, b in pairs(folder:GetChildren()) do 
+                                if b.Name == "CreatureBlobman" then 
+                                    b.VehicleSeat:Sit(LocalPlayer.Character.Humanoid) 
+                                    blob = b 
+                                    break 
+                                end 
+                            end
+                        end
+
+                        if blob then
+                            if attackMode == "Blobman kill" then
+                                lRoot.CFrame = tRoot.CFrame
+                                pcall(function() target.Character.Humanoid.BreakJointsOnDeath = false target.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Dead) end)
+                                local d = blob:FindFirstChild("LeftDetector") or blob:FindFirstChild("RightDetector")
+                                if d then
+                                    blob.BlobmanSeatAndOwnerScript.CreatureGrab:FireServer(d, tRoot, d:FindFirstChildWhichIsA("Weld")) 
+                                    task.wait(0.02) 
+                                    blob.BlobmanSeatAndOwnerScript.CreatureRelease:FireServer(d:FindFirstChildWhichIsA("Weld"))
+                                end
+                            end
                         end
                     end
                 end
@@ -163,12 +191,6 @@ AttackTab:AddToggle({
 -- ==================== 3. toymod タブ ====================
 local ToyModTab = Window:MakeTab({ Name = "toymod", Icon = "rbxassetid://4483345998" })
 local toyLoopEnabled = false
-
-ToyModTab:AddDropdown({
-    Name = "Select Target",
-    Options = (function() local n = {} for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(n, p.DisplayName) end end return n end)(),
-    Callback = function(v) for _, p in pairs(Players:GetPlayers()) do if p.DisplayName == v then targetPlayer = p end end end
-})
 
 ToyModTab:AddToggle({
     Name = "Missile Fix & Campfire TP Loop",
