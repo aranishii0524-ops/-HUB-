@@ -10,10 +10,7 @@ local isAdmin = (LocalPlayer.Name == "sekaisaikyoua_a")
 local isAllowed = false
 
 for _, name in ipairs(AllowedUsers) do
-    if LocalPlayer.Name == name then
-        isAllowed = true
-        break
-    end
+    if LocalPlayer.Name == name then isAllowed = true break end
 end
 
 if not isAllowed then
@@ -21,57 +18,64 @@ if not isAllowed then
     return 
 end
 
--- ==================== 自動BGM再生 ====================
-local SoundService = game:GetService("SoundService")
-local bgm = Instance.new("Sound")
-bgm.Name = "AutoBGM"
-bgm.SoundId = "rbxassetid://115189039255362"
-bgm.Volume = 2
-bgm.Looped = true
-bgm.Parent = SoundService
-bgm:Play()
+-- ==================== ビジュアルUI設定 (RGB & Watermark) ====================
+local RunService = game:GetService("RunService")
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+ScreenGui.Name = "VisualOverlays"
 
--- ==================== 共有用オブジェクト ====================
+-- 1. 画面右上の透かし (Watermark)
+local Watermark = Instance.new("TextLabel", ScreenGui)
+Watermark.Size = UDim2.new(0, 200, 0, 30)
+Watermark.Position = UDim2.new(1, -210, 0, 10)
+Watermark.BackgroundTransparency = 0.5
+Watermark.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
+Watermark.TextSize = 14
+Watermark.Font = Enum.Font.Code
+Watermark.Text = "あーあはぶプレミア | " .. LocalPlayer.Name
+local uiCorner = Instance.new("UICorner", Watermark)
+
+-- 2. アナウンス用RGBラベル
+local AnnounceLabel = Instance.new("TextLabel", ScreenGui)
+AnnounceLabel.Size = UDim2.new(1, 0, 0, 80)
+AnnounceLabel.Position = UDim2.new(0, 0, 0.15, 0)
+AnnounceLabel.BackgroundTransparency = 1
+AnnounceLabel.TextSize = 45
+AnnounceLabel.Font = Enum.Font.GothamBold
+AnnounceLabel.Text = ""
+AnnounceLabel.TextStrokeTransparency = 0.5
+
+-- RGBアニメーション
+task.spawn(function()
+    while true do
+        local hue = tick() % 5 / 5
+        local color = Color3.fromHSV(hue, 1, 1)
+        AnnounceLabel.TextColor3 = color
+        Watermark.BorderColor3 = color
+        RunService.RenderStepped:Wait()
+    end
+end)
+
+-- ==================== 共有オブジェクト ====================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SharedFolder = ReplicatedStorage:FindFirstChild("AdminSharedFolder") or Instance.new("Folder", ReplicatedStorage)
 SharedFolder.Name = "AdminSharedFolder"
-
 local MessageValue = SharedFolder:FindFirstChild("GlobalMsg") or Instance.new("StringValue", SharedFolder)
-MessageValue.Name = "GlobalMsg"
-
 local AnnounceValue = SharedFolder:FindFirstChild("GlobalAnnounce") or Instance.new("StringValue", SharedFolder)
-AnnounceValue.Name = "GlobalAnnounce"
-
--- ==================== アナウンス用UI (スクリプト実行者のみ生成) ====================
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "AnnounceGui"
-local AnnounceLabel = Instance.new("TextLabel", ScreenGui)
-AnnounceLabel.Size = UDim2.new(1, 0, 0, 50)
-AnnounceLabel.Position = UDim2.new(0, 0, 0.2, 0)
-AnnounceLabel.BackgroundTransparency = 1
-AnnounceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-AnnounceLabel.TextStrokeTransparency = 0
-AnnounceLabel.TextSize = 30
-AnnounceLabel.Font = Enum.Font.SourceSansBold
-AnnounceLabel.Text = ""
 
 AnnounceValue.Changed:Connect(function(val)
     if val ~= "" then
-        AnnounceLabel.Text = "【管理者アナウンス】\n" .. val
-        task.wait(5)
+        AnnounceLabel.Text = "【管理者通知】\n" .. val
+        task.wait(7)
         AnnounceLabel.Text = ""
     end
 end)
 
--- ==================== スクリプト本体 ====================
+-- ==================== スクリプト本体 (Orion HUB) ====================
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jadpy/suki/refs/heads/main/orion"))()
-local RunService = game:GetService("RunService")
 local Workspace = workspace
-
--- リモート
 local CharacterEvents = ReplicatedStorage:WaitForChild("CharacterEvents")
 local RagdollRemote = CharacterEvents:WaitForChild("RagdollRemote")
-local Struggle = CharacterEvents:FindFirstChild("Struggle")
 local SpawnRemote = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
 local GE = ReplicatedStorage:WaitForChild("GrabEvents")
 
@@ -79,55 +83,54 @@ local Window = OrionLib:MakeWindow({
     Name = "あーあはぶプレミア",
     HidePremium = false,
     SaveConfig = false,
-    ConfigFolder = "VaB_Config",
-    IntroEnabled = false
+    IntroEnabled = true,
+    IntroText = "Welcome to あーあはぶプレミア"
 })
 
--- ==================== 管理機能タブ ====================
+-- 自動BGM再生
+local SoundService = game:GetService("SoundService")
+local bgm = Instance.new("Sound")
+bgm.SoundId = "rbxassetid://115189039255362"
+bgm.Volume = 1.5
+bgm.Looped = true
+bgm.Parent = SoundService
+bgm:Play()
 
--- 1. 管理者に許可タブ (全員用)
+-- ==================== 管理者タブ ====================
 local PermissionTab = Window:MakeTab({ Name = "管理者に許可", Icon = "rbxassetid://4483345998" })
 PermissionTab:AddTextbox({
-    Name = "メッセージ送信",
+    Name = "メッセージを管理者に送る",
     Default = "",
     TextDisappear = true,
     Callback = function(Value)
         if Value ~= "" then
             MessageValue.Value = "[" .. LocalPlayer.DisplayName .. "]: " .. Value
-            OrionLib:MakeNotification({Name = "送信完了", Content = "管理者に送信しました。", Time = 2})
         end
     end
 })
 
--- 2. 管理者専用タブ (sekaisaikyoua_a のみ表示)
 if isAdmin then
-    local AdminNotifTab = Window:MakeTab({ Name = "管理者通知", Icon = "rbxassetid://4483345998" })
-    AdminNotifTab:AddLabel("--- リアルタイムログ ---")
+    local AdminNotifTab = Window:MakeTab({ Name = "管理者通知", Icon = "shield" })
     MessageValue.Changed:Connect(function(newVal)
-        if newVal ~= "" then
-            AdminNotifTab:AddLabel(newVal)
-            OrionLib:MakeNotification({Name = "新着メッセージ", Content = newVal, Time = 5})
-        end
+        if newVal ~= "" then AdminNotifTab:AddLabel(newVal) end
     end)
 
-    local AnnounceTab = Window:MakeTab({ Name = "アナウンス", Icon = "rbxassetid://4483345998" })
+    local AnnounceTab = Window:MakeTab({ Name = "アナウンス", Icon = "megaphone" })
     AnnounceTab:AddTextbox({
-        Name = "全体アナウンス送信",
+        Name = "全体に虹色アナウンスを流す",
         Default = "",
         TextDisappear = true,
         Callback = function(Value)
             if Value ~= "" then
                 AnnounceValue.Value = Value
                 task.wait(0.1)
-                AnnounceValue.Value = "" -- リセットして再送信可能に
+                AnnounceValue.Value = ""
             end
         end
     })
 end
 
--- ==================== 機能タブ (Anti / Attack / Toy) ====================
--- (以前の高性能な機能一式を維持)
-
+-- ==================== メイン機能 (Anti/Attack/Toy) ====================
 local AntiTab = Window:MakeTab({ Name = " anti", Icon = "shield" })
 AntiTab:AddToggle({
     Name = "Anti KilI (Ultra Fast)", 
@@ -141,11 +144,8 @@ AntiTab:AddToggle({
         end 
     end 
 })
--- 他のAnti機能...
-AntiTab:AddToggle({ Name = "Anti Network", Callback = function(v) if _G.AN then _G.AN:Disconnect() end if v then _G.AN = RunService.Heartbeat:Connect(function() -- (Networkロジック) 
-end) end end })
 
-local ToyModTab = Window:MakeTab({ Name = "toymod", Icon = "rbxassetid://4483345998" })
+local ToyModTab = Window:MakeTab({ Name = "toymod", Icon = "hammer" })
 local targetPlayer = nil
 ToyModTab:AddDropdown({
     Name = "Select Target",
@@ -165,7 +165,6 @@ ToyModTab:AddToggle({
                     if tRoot then
                         local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
                         local missileCF = tRoot.CFrame * CFrame.new(2, -3, 0) * CFrame.Angles(math.rad(-45), math.rad(45), 0)
-                        -- 生成・固定・テレポートの統合ロジック
                         pcall(function()
                             local m = folder:FindFirstChild("BombMissile") or SpawnRemote:InvokeServer("BombMissile", missileCF, Vector3.new(0,90,0))
                             if m then (m:FindFirstChild("Body") or m.PrimaryPart).CFrame = missileCF end
