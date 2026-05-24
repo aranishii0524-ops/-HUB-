@@ -2,7 +2,7 @@
 local AllowedUsers = {
     "sekaisaikyoua_a", "Tjrvovh30", "bananasabu85", "yuttan1029", "moro101971", 
     "apmp2286", "attj636", "pokotin0413", "akannde12121", "wdsauj1",
-    "fffffxyzz", "pnti042" -- 追加しました
+    "fffffxyzz", "pnti042", "ahehehe740" -- 追加しました
 }
 
 local Players = game:GetService("Players")
